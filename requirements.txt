@@ -1,5 +1,4 @@
 aiogram==2.25.1
-yt-dlp
+yt-dlp>=2024.03.10
 aiohttp
 aiofiles
-ffmpeg-python
