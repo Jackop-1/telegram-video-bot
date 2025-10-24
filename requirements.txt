@@ -2,4 +2,3 @@ aiogram==2.25.1
 yt-dlp>=2024.03.10
 aiohttp
 aiofiles
-nest_asyncio
