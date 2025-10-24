@@ -1,13 +1,13 @@
 services:
   - type: worker
     name: telegram-video-bot
-    env: python
-    buildCommand: |
-      apt-get update && apt-get install -y ffmpeg
-      pip install -r requirements.txt
-    startCommand: python bot.py
+    env: docker
+    plan: free
+    autoDeploy: true
+    buildCommand: ""
+    startCommand: "python bot.py"
     envVars:
       - key: BOT_TOKEN
-        sync: false     # apna Telegram bot token manually Render dashboard me daal
-      - key: CLOUD_PROVIDER
-        value: transfer
+        sync: false
+      - key: OWNER_ID
+        sync: false
