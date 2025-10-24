@@ -3,7 +3,6 @@ services:
     name: telegram-video-bot
     env: docker
     plan: free
-    autoDeploy: true
     buildCommand: ""
     startCommand: "python bot.py"
     envVars:
