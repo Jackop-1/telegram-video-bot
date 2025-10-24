@@ -1,4 +1,4 @@
-# bot.py — Public Telegram Downloader (Replit version, fixed)
+# bot.py — Public Telegram Downloader (Replit Ultimate Version)
 # Supports YouTube / Instagram / Facebook + MP3 + transfer.sh
 # Author: Jackop + ChatGPT 💥
 
@@ -18,7 +18,6 @@ os.system("pip install -U yt-dlp > /dev/null 2>&1")
 import yt_dlp
 import aiohttp
 from aiogram import Bot, Dispatcher, types
-from aiogram.utils import executor
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 # ---------------- CONFIG ----------------
@@ -199,5 +198,14 @@ async def on_download(cq: types.CallbackQuery):
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
-    print("🚀 Bot running — Public Mode (Replit Optimized)")
-    executor.start_polling(dp, skip_updates=True)
+    import nest_asyncio
+    nest_asyncio.apply()
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    async def main():
+        print("🚀 Bot running — Public Mode (Replit Ultimate Fix)")
+        await dp.start_polling()
+
+    loop.run_until_complete(main())
