@@ -1,5 +1,6 @@
-# bot.py — Public Telegram Video Downloader
-# Works on Replit, supports YouTube / Instagram / Facebook / MP3
+# bot.py — Public Telegram Downloader (Replit version, fixed)
+# Supports YouTube / Instagram / Facebook + MP3 + transfer.sh
+# Author: Jackop + ChatGPT 💥
 
 import os
 import asyncio
@@ -8,8 +9,10 @@ import shutil
 import time
 from pathlib import Path
 import logging
+import nest_asyncio  # 🩵 Replit async fix
+nest_asyncio.apply()
 
-# Auto update yt-dlp for latest sites
+# auto update yt-dlp
 os.system("pip install -U yt-dlp > /dev/null 2>&1")
 
 import yt_dlp
@@ -18,25 +21,25 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.utils import executor
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-# ---------------- Config ----------------
+# ---------------- CONFIG ----------------
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise RuntimeError("❌ BOT_TOKEN missing! Add it in Replit Secrets.")
 
-TELEGRAM_FILE_LIMIT = 50 * 1024 * 1024  # 50MB limit
+TELEGRAM_FILE_LIMIT = 50 * 1024 * 1024  # 50 MB
 logging.basicConfig(level=logging.INFO)
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(bot)
 
-# ---------------- Helper Functions ----------------
+# ---------------- HELPERS ----------------
 def human_size(n):
     if not n:
         return "unknown"
     step = 1024.0
-    units = ["B","KB","MB","GB"]
+    units = ["B", "KB", "MB", "GB"]
     i = 0
-    while n >= step and i < len(units)-1:
+    while n >= step and i < len(units) - 1:
         n /= step
         i += 1
     return f"{n:.1f}{units[i]}"
@@ -67,6 +70,7 @@ class ProgressHook:
     def __init__(self, edit_func):
         self.last = 0
         self.edit = edit_func
+
     def __call__(self, d):
         if d["status"] == "downloading":
             total = d.get("total_bytes") or d.get("total_bytes_estimate")
@@ -84,16 +88,19 @@ async def upload_transfer(file_path, status_edit):
         async with session.put(f"https://transfer.sh/{filename}", data=open(file_path, "rb")) as resp:
             if resp.status == 200:
                 link = (await resp.text()).strip()
-                await status_edit(f"🔗 Uploaded: {link}")
+                await status_edit(f"🔗 Uploaded to transfer.sh:\n{link}")
                 return link
             else:
                 await status_edit(f"❌ Upload failed ({resp.status})")
                 return None
 
-# ---------------- Handlers ----------------
-@dp.message_handler(commands=["start","help"])
+# ---------------- HANDLERS ----------------
+@dp.message_handler(commands=["start", "help"])
 async def start(msg: types.Message):
-    await msg.answer("👋 Hi! Send me a YouTube / Instagram / Facebook link.\nChoose HD or MP3 format and get your file!")
+    await msg.answer(
+        "👋 Hi! Send me any YouTube / Instagram / Facebook link.\n"
+        "You can choose HD or MP3 format, and I’ll send it to you 🎬🎵"
+    )
 
 @dp.message_handler()
 async def handle_link(msg: types.Message):
@@ -102,7 +109,7 @@ async def handle_link(msg: types.Message):
         await msg.answer("❌ Please send a valid link.")
         return
 
-    info_msg = await msg.answer("🔍 Fetching info...")
+    info_msg = await msg.answer("🔍 Fetching video info...")
 
     loop = asyncio.get_event_loop()
 
@@ -115,7 +122,7 @@ async def handle_link(msg: types.Message):
         info = await loop.run_in_executor(None, fetch_info)
         formats = info.get("formats", [])
         kb = build_formats_keyboard(formats)
-        caption = f"🎬 <b>{info.get('title','Video')}</b>\nSelect format:"
+        caption = f"🎬 <b>{info.get('title','Video')}</b>\nSelect a format below:"
         await info_msg.edit_text(caption, parse_mode="HTML", reply_markup=kb)
     except Exception as e:
         await info_msg.edit_text(f"❌ Error fetching info: {e}")
@@ -125,7 +132,7 @@ async def handle_link(msg: types.Message):
 @dp.callback_query_handler(lambda c: c.data and c.data.startswith("dl|"))
 async def on_download(cq: types.CallbackQuery):
     await cq.answer()
-    data = cq.data.split("|",1)[1]
+    data = cq.data.split("|", 1)[1]
     url = getattr(dp, "last_url", None)
     if not url:
         await cq.message.answer("❌ Please send the link again.")
@@ -138,7 +145,7 @@ async def on_download(cq: types.CallbackQuery):
         opts = {
             "outtmpl": os.path.join(tmpdir, "%(title).200s.%(ext)s"),
             "quiet": True,
-            "progress_hooks": [ProgressHook(lambda t: status.edit_text(t))]
+            "progress_hooks": [ProgressHook(lambda t: status.edit_text(t))],
         }
 
         if data == "audio_mp3":
@@ -147,18 +154,19 @@ async def on_download(cq: types.CallbackQuery):
                 "postprocessors": [{
                     "key": "FFmpegExtractAudio",
                     "preferredcodec": "mp3",
-                    "preferredquality": "192"
+                    "preferredquality": "192",
                 }],
             })
         else:
             opts["format"] = data
 
         loop = asyncio.get_event_loop()
+
         def run_dl():
             with yt_dlp.YoutubeDL(opts) as ydl:
                 return ydl.extract_info(url, download=True)
-        info = await loop.run_in_executor(None, run_dl)
 
+        info = await loop.run_in_executor(None, run_dl)
         files = list(Path(tmpdir).glob("*"))
         if not files:
             await status.edit_text("❌ No file found after download.")
@@ -176,7 +184,6 @@ async def on_download(cq: types.CallbackQuery):
         ext = Path(file_path).suffix.lower()
         await status.edit_text("📤 Uploading to Telegram...")
 
-        # send file to same user
         if ext in [".mp4", ".mkv", ".mov", ".webm"]:
             await bot.send_video(cq.from_user.id, open(file_path, "rb"), caption=Path(file_path).name)
         elif ext in [".mp3", ".m4a", ".wav"]:
@@ -190,7 +197,7 @@ async def on_download(cq: types.CallbackQuery):
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
 
-# ---------------- Run ----------------
+# ---------------- RUN ----------------
 if __name__ == "__main__":
-    print("🚀 Bot is running (Public Mode)...")
+    print("🚀 Bot running — Public Mode (Replit Optimized)")
     executor.start_polling(dp, skip_updates=True)
