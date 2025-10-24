@@ -1,0 +1,6 @@
+aiogram==2.25.1
+yt-dlp
+aiohttp
+aiofiles
+requests
+ffmpeg-python
